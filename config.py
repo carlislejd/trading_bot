@@ -15,5 +15,5 @@ def ccxt_connect():
     exchange_id = 'binance'
     exchange_class = getattr(ccxt, exchange_id)
     exchange = ccxt.binance()
-    exchange = exchange_class({'apiKey': getenv('BINANCE_API '), 'secret': getenv('BINANCE_SECRET')})
+    exchange = exchange_class({'apiKey': getenv('BINANCE_API '), 'secret': getenv('BINANCE_SECRET'), 'enableRateLimit': True})
     return exchange
