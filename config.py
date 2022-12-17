@@ -12,7 +12,7 @@ def price_collection():
     return db.historicalusds
 
 def ccxt_connect():
-    exchange_id = 'binance'
+    exchange_id = 'binanceus'
     exchange_class = getattr(ccxt, exchange_id)
     exchange = ccxt.binance()
     exchange = exchange_class({'apiKey': getenv('BINANCE_API '), 'secret': getenv('BINANCE_SECRET'), 'enableRateLimit': True})
