@@ -1,43 +1,76 @@
+import time
 import talib
+import sched
 import pandas as pd
 
-from config import ccxt_connect
+from config import binance_client, prices_collection
 from helper import long_short
 
 
 
-exchange = ccxt_connect()
+s = sched.scheduler(time.time, time.sleep)
 
+def run(sc):
+    client = binance_client()
+    prices = prices_collection()
 
-data = pd.read_parquet('data/eth_data.parquet')
+    last_date = prices.find().sort('date', -1).limit(1).next()['date']
+    print('Finding the last record in our DB')
 
-last_date = int(round(data['date'].iloc[-1].timestamp() * 1000)) + 1
+    new_data_query = client.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=1000)
+    print('Getting new data from Binance API (5m interval)')
 
-new_data_query = exchange.fetch_ohlcv('ETH/USDT', '5m', limit=250, since=last_date)
+    new_data = pd.DataFrame(new_data_query[:-1], columns=['Open time', 'open', 'high', 'low', 'close', 'vol', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'])
+    new_data['date'] = pd.to_datetime(new_data['Close time'], unit='ms')
+    cols_to_drop = ['Open time', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore']
+    new_data.drop(cols_to_drop, axis=1, inplace=True)
 
-new_data = pd.DataFrame(new_data_query[:-1], columns=['at', 'open', 'high', 'low', 'close', 'vol'])
-new_data['date'] = pd.to_datetime(new_data['at'], unit='ms')
-new_data.drop('at', axis=1, inplace=True)
+    cols = ['open', 'high', 'low', 'close', 'vol']
+    new_data[cols] = new_data[cols].apply(pd.to_numeric, errors='ignore', axis=1)
 
-if len(new_data) > 0:
-    data = pd.concat([data, new_data])
-    data.reset_index()
-    data.to_parquet('data/eth_data.parquet')
+    if len(new_data) > 0:
+        print('Inserting new data into DB')
+        prices_collection().insert_many(new_data.to_dict('records'))
 
-data = pd.read_parquet('data/eth_data.parquet')
+    df = pd.DataFrame(list(prices.find().sort('date', -1).limit(300)))
+    df.sort_values('date', inplace=True)
 
-df = data.copy()
-df.set_index('date', inplace=True)
-close = df['close'].values
-df['rsi'] = talib.RSI(close, timeperiod=14)
-df['macd'], df['macdsignal'], df['macdhist'] = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-df['EMA9'] = talib.EMA(df.close, 9)
-df['EMA55'] = talib.EMA(df.close, 55)
-df['EMA200'] = talib.EMA(df.close, 200)
+    df.set_index('date', inplace=True)
+    close = df['close'].values
+    df['rsi'] = talib.RSI(close, timeperiod=14)
+    macd, macdsignal, df['macdhist'] = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
+    df['EMA9'] = talib.EMA(df.close, 9)
+    df['EMA55'] = talib.EMA(df.close, 55)
+    df['EMA200'] = talib.EMA(df.close, 200)
 
-df['date'] = df.index
-df.reset_index(drop=True, inplace=True)
-df.fillna(method='ffill', inplace=True)
-df = df.iloc[-200:][['date', 'close', 'rsi', 'macdhist', 'EMA9', 'EMA55', 'EMA200']]
+    df['date'] = df.index
+    df.reset_index(drop=True, inplace=True)
+    df.fillna(method='ffill', inplace=True)
 
-df['signal'] = df.apply(long_short, axis=1)
+    print('Calculating signals')
+    df['signal'] = df.apply(long_short, axis=1)
+
+    symbol = 'ETHUSD'
+    if df['signal'].iloc[-1] != df['signal'].iloc[-2]:
+        if df['signal'].iloc[-1] == 'Long':
+            print('Flipped to long')
+            balance = client.get_asset_balance(asset='USD')
+            quantity = float(balance['free'])
+            order = client.create_order(symbol=symbol, side='BUY', type='MARKET', quoteOrderQty=quantity)
+            print(order)
+        if df['signal'].iloc[-1] == 'Short':
+            print('Flipped to short')
+            balance = client.get_asset_balance(asset='ETH')
+            quantity = float(balance['free'])
+            order = client.create_order(symbol=symbol, side='SELL', type='MARKET', quoteOrderQty=quantity)
+            print(order)
+        if df['signal'].iloc[-1] == 'None':
+            print('No change in trend')
+            pass
+    else:
+        print('No change in trend')
+    s.enter(300, 1, run, (sc,))
+
+print('Starting the scheduler')
+s.enter(300, 1, run, (s,))
+s.run()
