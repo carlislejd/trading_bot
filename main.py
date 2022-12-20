@@ -3,8 +3,9 @@ import talib
 import sched
 import pandas as pd
 
+from strategy import long_short
 from config import binance_client, prices_collection
-from helper import long_short
+from helper import check_decimals, current_position
 
 
 
@@ -17,7 +18,7 @@ def run(sc):
     last_date = prices.find().sort('date', -1).limit(1).next()['date']
     print('Finding the last record in our DB')
 
-    new_data_query = client.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=1000)
+    new_data_query = client.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=100)
     print('Getting new data from Binance API (5m interval)')
 
     new_data = pd.DataFrame(new_data_query[:-1], columns=['Open time', 'open', 'high', 'low', 'close', 'vol', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'])
@@ -51,25 +52,45 @@ def run(sc):
     df['signal'] = df.apply(long_short, axis=1)
 
     symbol = 'ETHUSD'
-    if df['signal'].iloc[-1] != df['signal'].iloc[-2]:
-        if df['signal'].iloc[-1] == 'Long':
-            print('Flipped to long')
-            balance = client.get_asset_balance(asset='USD')
-            quantity = float(balance['free'])
-            order = client.create_order(symbol=symbol, side='BUY', type='MARKET', quoteOrderQty=quantity)
-            print(order)
-        if df['signal'].iloc[-1] == 'Short':
-            print('Flipped to short')
-            balance = client.get_asset_balance(asset='ETH')
-            quantity = float(balance['free'])
-            order = client.create_order(symbol=symbol, side='SELL', type='MARKET', quoteOrderQty=quantity)
-            print(order)
-        if df['signal'].iloc[-1] == 'None':
-            print('No change in trend')
-            pass
+    decimal = check_decimals(symbol)
+
+    signal = df['signal'].iloc[-1]
+    position = current_position()
+
+
+
+    signal = df['signal'].iloc[-1]
+    price = df['close'].iloc[-1]
+    position = current_position()
+    print(f'Current signal: {signal}, current position: {position}')
+
+    if signal == position:
+        print('No change in position')
+        
     else:
-        print('No change in trend')
+        with open('current_position.txt', 'w') as f:
+            f.write(signal)
+
+        if signal == 'BUY':
+            print(f'Signal went from: {position} to {signal}, flipping to long at {price}')
+            balance = client.get_asset_balance(asset='USD')
+            quantity = (round((float(balance['free']) * .95), decimal) / price)
+            order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
+            print(order)
+
+        if signal == 'SELL':
+            print(f'Signal went from: {position} to {signal}, flipping to short at {price}')
+            balance = client.get_asset_balance(asset='ETH')
+            quantity = round((float(balance['free']) * .95), decimal)
+            order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
+            print(order)
+
+        if signal == 'None':
+            print('No signal, holding position')
+            pass
+
     s.enter(300, 1, run, (sc,))
+
 
 print('Starting the scheduler')
 s.enter(300, 1, run, (s,))

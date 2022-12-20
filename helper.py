@@ -1,4 +1,5 @@
 import pandas as pd
+from config import binance_client
 
 
 def vwap(data: pd.DataFrame) -> pd.DataFrame:
@@ -22,10 +23,25 @@ def vwap(data: pd.DataFrame) -> pd.DataFrame:
         vwap_data = vwap_data.append({'date': row['date'], 'vwap': vwap}, ignore_index=True)
         
     return vwap_data
+    
+
+def check_decimals(symbol):
+    client = binance_client()
+    info = client.get_symbol_info(symbol)
+    val = info['filters'][2]['stepSize']
+    decimal = 0
+    is_dec = False
+    for c in val:
+        if is_dec is True:
+            decimal += 1
+        if c == '1':
+            break
+        if c == '.':
+            is_dec = True
+    return decimal
 
 
-def long_short(df):
-    if (df['EMA9'] > df['EMA55']) and (df['rsi'] >= 51) and (df['macdhist'] >= 0):
-        return 'Long'
-    if (df['EMA9'] < df['EMA55']) and (df['rsi'] <= 49) and (df['macdhist'] <= 0):
-        return 'Short'
+def current_position():
+    with open('current_position.txt', 'r') as f:
+        for current_position in f:
+            return current_position
