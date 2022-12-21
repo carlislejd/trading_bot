@@ -1,5 +1,6 @@
 # Strategy
 strategy.py
+current_position.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

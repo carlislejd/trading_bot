@@ -2,21 +2,23 @@ import time
 import talib
 import sched
 import pandas as pd
+from time import time, sleep
 
+from datetime import datetime
 from strategy import long_short
 from config import binance_client, prices_collection
 from helper import check_decimals, current_position
 
 
 
-s = sched.scheduler(time.time, time.sleep)
 
-def run(sc):
+
+def run():
     client = binance_client()
     prices = prices_collection()
 
     last_date = prices.find().sort('date', -1).limit(1).next()['date']
-    print('Finding the last record in our DB')
+    print(f'Finding the last record in our DB')
 
     new_data_query = client.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=100)
     print('Getting new data from Binance API (5m interval)')
@@ -30,7 +32,7 @@ def run(sc):
     new_data[cols] = new_data[cols].apply(pd.to_numeric, errors='ignore', axis=1)
 
     if len(new_data) > 0:
-        print('Inserting new data into DB')
+        print(f'Inserting new data into DB')
         prices_collection().insert_many(new_data.to_dict('records'))
 
     df = pd.DataFrame(list(prices.find().sort('date', -1).limit(300)))
@@ -55,43 +57,37 @@ def run(sc):
     decimal = check_decimals(symbol)
 
     signal = df['signal'].iloc[-1]
-    position = current_position()
-
-
-
-    signal = df['signal'].iloc[-1]
     price = df['close'].iloc[-1]
     position = current_position()
     print(f'Current signal: {signal}, current position: {position}')
 
-    if signal == position:
-        print('No change in position')
+    if signal == position or signal == 'None':
+        print('No change in position, sleep for 5min and rescan')
         
     else:
         with open('current_position.txt', 'w') as f:
-            f.write(signal)
+            f.write(str(signal))
 
         if signal == 'BUY':
             print(f'Signal went from: {position} to {signal}, flipping to long at {price}')
             balance = client.get_asset_balance(asset='USD')
-            quantity = (round((float(balance['free']) * .95), decimal) / price)
+            quantity = (round((float(balance['free']) * .95), 3) / price)
+            print(f'ETH price: {price}')
+            print(f'Buying {quantity} {symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
             print(order)
 
         if signal == 'SELL':
             print(f'Signal went from: {position} to {signal}, flipping to short at {price}')
             balance = client.get_asset_balance(asset='ETH')
-            quantity = round((float(balance['free']) * .95), decimal)
+            quantity = round((float(balance['free']) * .95), 3)
+            print(f'Selling {quantity} {symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
             print(order)
 
-        if signal == 'None':
-            print('No signal, holding position')
-            pass
 
-    s.enter(300, 1, run, (sc,))
-
-
-print('Starting the scheduler')
-s.enter(300, 1, run, (s,))
-s.run()
+if __name__ == '__main__':
+    starttime = time()
+    while True:
+        run()
+        sleep(300 - ((time() - starttime) % 300))
