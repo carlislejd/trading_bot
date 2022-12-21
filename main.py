@@ -61,7 +61,7 @@ def run():
     position = current_position()
     print(f'Current signal: {signal}, current position: {position}')
 
-    if signal == position or signal == 'None':
+    if signal == position or signal == None:
         print('No change in position, sleep for 5min and rescan')
         
     else:
@@ -71,16 +71,20 @@ def run():
         if signal == 'BUY':
             print(f'Signal went from: {position} to {signal}, flipping to long at {price}')
             balance = client.get_asset_balance(asset='USD')
-            quantity = (round((float(balance['free']) * .95), 3) / price)
+            usd_balance = float(balance['free']) * .95
+            print(f'USD Balance: {usd_balance}')
+            quantity = round((usd_balance / price), decimal)
             print(f'ETH price: {price}')
-            print(f'Buying {quantity} {symbol}')
+            print(f'Taking 95% of USD balance: {usd_balance * .95} and getting ETH quantity we can buy with it: {quantity}{symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
             print(order)
 
         if signal == 'SELL':
             print(f'Signal went from: {position} to {signal}, flipping to short at {price}')
             balance = client.get_asset_balance(asset='ETH')
-            quantity = round((float(balance['free']) * .95), 3)
+            eth_balance = float(balance['free']) * .95
+            print(f'ETH Balance: {eth_balance}')
+            quantity = round(eth_balance, decimal)
             print(f'Selling {quantity} {symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
             print(order)
