@@ -7,7 +7,7 @@ from time import time, sleep
 from datetime import datetime
 from strategy import long_short
 from config import binance_client, prices_collection
-from helper import check_decimals, current_position
+from helper import check_decimals, current_position, telegram_notification
 
 
 
@@ -77,6 +77,7 @@ def run():
             print(f'ETH price: {price}')
             print(f'Taking 95% of USD balance: {usd_balance * .95} and getting ETH quantity we can buy with it: {quantity}{symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
+            telegram_notification(order)
             print(order)
 
         if signal == 'SELL':
@@ -87,6 +88,7 @@ def run():
             quantity = round(eth_balance, decimal)
             print(f'Selling {quantity} {symbol}')
             order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
+            telegram_notification(order)
             print(order)
 
 

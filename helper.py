@@ -1,6 +1,10 @@
+import requests
 import pandas as pd
+from os import getenv
+from dotenv import load_dotenv
 from config import binance_client
 
+load_dotenv()
 
 def vwap(data: pd.DataFrame) -> pd.DataFrame:
     """Calculates volume-weighted average price (VWAP) for a 5 minute chart.
@@ -45,3 +49,13 @@ def current_position():
     with open('current_position.txt', 'r') as f:
         for current_position in f:
             return current_position
+        
+
+def telegram_notification(message):
+    token = getenv('TELEGRAM')
+    chat_id = getenv('TELEGRAM_CHAT_ID')
+    message = message
+
+    url = f'https://api.telegram.org/bot{token}/sendMessage?chat_id={chat_id}&text={message}'
+
+    print(requests.get(url).json())
