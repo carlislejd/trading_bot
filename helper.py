@@ -2,7 +2,6 @@ import requests
 import pandas as pd
 from os import getenv
 from dotenv import load_dotenv
-from config import binance_client
 
 load_dotenv()
 
@@ -28,22 +27,6 @@ def vwap(data: pd.DataFrame) -> pd.DataFrame:
         
     return vwap_data
     
-
-def check_decimals(symbol):
-    client = binance_client()
-    info = client.get_symbol_info(symbol)
-    val = info['filters'][2]['stepSize']
-    decimal = 0
-    is_dec = False
-    for c in val:
-        if is_dec is True:
-            decimal += 1
-        if c == '1':
-            break
-        if c == '.':
-            is_dec = True
-    return decimal
-
 
 def current_position():
     with open('current_position.txt', 'r') as f:
