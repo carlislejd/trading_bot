@@ -79,7 +79,7 @@ def run():
                 close = client.create_order(
                         symbol = 'ETHUSD',
                         type = 'market',
-                        side = 'sell',
+                        side = 'buy',
                         amount = int(last_order[-1]['info']['qty']),
                         params = {'reduce_only': True})
             quantity = round((float(balance['ETH']['free']) * .95), 3)
@@ -100,7 +100,7 @@ def run():
                 close = client.create_order(
                         symbol = 'ETHUSD',
                         type = 'market',
-                        side = 'buy',
+                        side = 'sell',
                         amount = int(last_order[-1]['info']['qty']),
                         params = {'reduce_only': True})
             quantity = round((float(balance['ETH']['free']) * .95), 3)
