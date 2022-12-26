@@ -16,11 +16,14 @@ prices = prices_collection()
 
 
 def run():
+    print('Starting the bot')
+    print(f"Current time: {datetime.utcnow().strftime('%m-%d-%y-%H:%M:%S')}")
+
     last_date = prices.find().sort('date', -1).limit(1).next()['date']
     print(f"Finding the last record in our DB: \n{last_date.strftime('%m-%d-%y-%H:%M:%S')}")
 
     print(f'Querying data from binance to make current')
-    new_data_query = binance.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=1000)
+    new_data_query = binance.get_klines(symbol='ETHUSDT', interval=binance.KLINE_INTERVAL_5MINUTE, endTime=int(last_date.timestamp() * 1000))
     print('Getting new data from Binance API (5m interval)')
 
     new_data = pd.DataFrame(new_data_query[:-1], columns=['Open time', 'open', 'high', 'low', 'close', 'vol', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'])
@@ -55,10 +58,11 @@ def run():
 
     symbol = 'ETHUSD'
 
+    date = df['date'].iloc[-1]
     signal = df['signal'].iloc[-1]
     price = df['close'].iloc[-1]
     position = current_position()
-    print(f'Current signal: {signal}, current position: {position}, current price: {price}')
+    print(f'New last record: {date}, Current signal: {signal}, Current position: {position}, Current price: {price}')
 
     if signal == position or signal == None:
         print('No change in position, sleep for 5min and rescan')

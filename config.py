@@ -13,7 +13,7 @@ def bybit_client():
     return client
 
 def binance_client():
-    client = Client(getenv('BINANCE_API'), getenv('BINANCE_SECRET'), tld='us')
+    client = Client(getenv('BINANCE_API'), getenv('BINANCE_SECRET'), tld='us', testnet=False)
     return client
 
 def prices_collection():
