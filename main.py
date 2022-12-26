@@ -6,21 +6,21 @@ from time import time, sleep
 
 from datetime import datetime
 from strategy import long_short
-from config import binance_client, prices_collection
-from helper import check_decimals, current_position, telegram_notification
+from config import ccxt_connect, prices_collection, binance_client
+from helper import current_position, telegram_notification
 
 
-
+client = ccxt_connect()
+binance = binance_client()
+prices = prices_collection()
 
 
 def run():
-    client = binance_client()
-    prices = prices_collection()
-
     last_date = prices.find().sort('date', -1).limit(1).next()['date']
-    print(f'Finding the last record in our DB')
+    print(f"Finding the last record in our DB: \n{last_date.strftime('%m-%d-%y-%H:%M:%S')}")
 
-    new_data_query = client.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=100)
+    print(f'Querying data from binance to make current')
+    new_data_query = binance.get_historical_klines('ETHUSDT', '5m', str(last_date), limit=1000)
     print('Getting new data from Binance API (5m interval)')
 
     new_data = pd.DataFrame(new_data_query[:-1], columns=['Open time', 'open', 'high', 'low', 'close', 'vol', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'])
@@ -54,12 +54,11 @@ def run():
     df['signal'] = df.apply(long_short, axis=1)
 
     symbol = 'ETHUSD'
-    decimal = check_decimals(symbol)
 
     signal = df['signal'].iloc[-1]
     price = df['close'].iloc[-1]
     position = current_position()
-    print(f'Current signal: {signal}, current position: {position}')
+    print(f'Current signal: {signal}, current position: {position}, current price: {price}')
 
     if signal == position or signal == None:
         print('No change in position, sleep for 5min and rescan')
@@ -70,30 +69,49 @@ def run():
 
         if signal == 'BUY':
             print(f'Signal went from: {position} to {signal}, flipping to long at {price}')
-            balance = client.get_asset_balance(asset='USD')
-            usd_balance = float(balance['free']) * .95
-            print(f'USD Balance: {usd_balance}')
-            quantity = round((usd_balance / price), decimal)
-            print(f'ETH price: {price}')
-            print(f'Taking 95% of USD balance: {usd_balance * .95} and getting ETH quantity we can buy with it: {quantity}{symbol}')
-            order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
-            telegram_notification(f"{order['symbol']} {order['side']} {order['executedQty']} at {order['fills'][0]['price']}")
+            balance = client.fetch_balance()
+            last_order = client.fetch_closed_orders(symbol)
+            if last_order[-1]['info']['side'] == 'Sell':
+                close = client.create_order(
+                        symbol = 'ETHUSD',
+                        type = 'market',
+                        side = 'sell',
+                        amount = int(last_order[-1]['info']['qty']),
+                        params = {'reduce_only': True})
+            quantity = round((float(balance['ETH']['free']) * .95), 3)
+            order = client.create_order(
+                    symbol = 'ETHUSD',
+                    type = 'market',
+                    side = 'buy',
+                    amount = (price * quantity) * 5,
+                    params = {'leverage': 5})
+            telegram_notification(order)
             print(order)
 
         if signal == 'SELL':
             print(f'Signal went from: {position} to {signal}, flipping to short at {price}')
-            balance = client.get_asset_balance(asset='ETH')
-            eth_balance = float(balance['free']) * .95
-            print(f'ETH Balance: {eth_balance}')
-            quantity = round(eth_balance, decimal)
-            print(f'Selling {quantity} {symbol}')
-            order = client.create_order(symbol=symbol, side=signal, type='MARKET', quantity=quantity)
-            telegram_notification(f"{order['symbol']} {order['side']} {order['executedQty']} at {order['fills'][0]['price']}")
+            balance = client.fetch_balance()
+            last_order = client.fetch_closed_orders(symbol)
+            if last_order[-1]['info']['side'] == 'Buy':
+                close = client.create_order(
+                        symbol = 'ETHUSD',
+                        type = 'market',
+                        side = 'buy',
+                        amount = int(last_order[-1]['info']['qty']),
+                        params = {'reduce_only': True})
+            quantity = round((float(balance['ETH']['free']) * .95), 3)
+            order = client.create_order(
+                    symbol = 'ETHUSD',
+                    type = 'market',
+                    side = 'sell',
+                    amount = (price * quantity) * 5,
+                    params = {'leverage': 5})
+            telegram_notification(order)
             print(order)
 
 
-if __name__ == '__main__':
-    starttime = time()
-    while True:
-        run()
-        sleep(300 - ((time() - starttime) % 300))
+
+starttime = time()
+while True:
+    run()
+    sleep(300 - ((time() - starttime) % 300))
