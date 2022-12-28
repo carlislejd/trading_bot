@@ -5,7 +5,7 @@ import pandas as pd
 from time import time, sleep
 
 from datetime import datetime
-from strategy import long_short
+from strategy import long_short, create_signal
 from config import ccxt_connect, prices_collection, binance_client
 from helper import current_position, telegram_notification
 
@@ -53,26 +53,29 @@ def run():
     df.reset_index(drop=True, inplace=True)
     df.fillna(method='ffill', inplace=True)
 
+    df.drop_duplicates(subset='date', keep='last', inplace=True)
+
     print('Calculating signals')
-    df['signal'] = df.apply(long_short, axis=1)
+    df['cross'] = df.apply(long_short, axis=1)
+
+    df['signal'] = df[df['cross'] != 0]['cross'].diff()
+    df['signal'].fillna(0, inplace=True)
+
+    df['action'] = df.apply(create_signal, axis=1)
 
     symbol = 'ETHUSD'
 
     date = df['date'].iloc[-1]
-    signal = df['signal'].iloc[-1]
+    signal = df['action'].iloc[-1]
     price = df['close'].iloc[-1]
-    position = current_position()
-    print(f'New last record: {date}, Current signal: {signal}, Current position: {position}, Current price: {price}')
+    print(f'New last record: {date}, Current signal: {signal}, Current price: {price}')
 
-    if signal == position or signal == None:
+    if signal == None:
         print('No change in position, sleep for 5min and rescan')
         
     else:
-        with open('current_position.txt', 'w') as f:
-            f.write(str(signal))
-
-        if signal == 'BUY':
-            print(f'Signal went from: {position} to {signal}, flipping to long at {price}')
+        if signal == 'Buy':
+            print(f'Flipping to long at {price}')
             balance = client.fetch_balance()
             last_order = client.fetch_closed_orders(symbol)
             if last_order[-1]['info']['side'] == 'Sell':
@@ -80,9 +83,12 @@ def run():
                         symbol = 'ETHUSD',
                         type = 'market',
                         side = 'buy',
-                        amount = int(last_order[-1]['info']['qty']),
+                        amount = int(last_order[-1]['info']['qty']),               
                         params = {'reduce_only': True})
-            quantity = round((float(balance['ETH']['free']) * .95), 3)
+            sleep(2)
+            balance = client.fetch_balance()
+            print(balance['ETH'])
+            quantity = round((float(balance['ETH']['total']) * .95), 3)
             order = client.create_order(
                     symbol = 'ETHUSD',
                     type = 'market',
@@ -92,8 +98,8 @@ def run():
             telegram_notification(order)
             print(order)
 
-        if signal == 'SELL':
-            print(f'Signal went from: {position} to {signal}, flipping to short at {price}')
+        if signal == 'Sell':
+            print(f'Flipping to short at {price}')
             balance = client.fetch_balance()
             last_order = client.fetch_closed_orders(symbol)
             if last_order[-1]['info']['side'] == 'Buy':
@@ -103,7 +109,10 @@ def run():
                         side = 'sell',
                         amount = int(last_order[-1]['info']['qty']),
                         params = {'reduce_only': True})
-            quantity = round((float(balance['ETH']['free']) * .95), 3)
+            sleep(2)
+            balance = client.fetch_balance()
+            print(balance['ETH'])
+            quantity = round((float(balance['ETH']['total']) * .95), 3)
             order = client.create_order(
                     symbol = 'ETHUSD',
                     type = 'market',
@@ -112,7 +121,6 @@ def run():
                     params = {'leverage': 5})
             telegram_notification(order)
             print(order)
-
 
 
 starttime = time()
