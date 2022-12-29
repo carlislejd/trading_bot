@@ -23,7 +23,7 @@ def run():
     print(f"Finding the last record in our DB: \n{last_date.strftime('%m-%d-%y-%H:%M:%S')}")
 
     print(f'Querying data from binance to make current')
-    new_data_query = binance.get_klines(symbol='ETHUSDT', interval=binance.KLINE_INTERVAL_5MINUTE, endTime=int(last_date.timestamp() * 1000))
+    new_data_query = binance.get_klines(symbol='ETHUSDT', interval=binance.KLINE_INTERVAL_5MINUTE, endTime=int(last_date.timestamp() * 1000 + 1000), limit=2)
     print('Getting new data from Binance API (5m interval)')
 
     new_data = pd.DataFrame(new_data_query[:-1], columns=['Open time', 'open', 'high', 'low', 'close', 'vol', 'Close time', 'Quote asset volume', 'Number of trades', 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'])
@@ -41,19 +41,19 @@ def run():
     df = pd.DataFrame(list(prices.find().sort('date', -1).limit(300)))
     df.sort_values('date', inplace=True)
 
+    df.drop_duplicates(subset='date', keep='last', inplace=True)
+
     df.set_index('date', inplace=True)
     close = df['close'].values
     df['rsi'] = talib.RSI(close, timeperiod=14)
     macd, macdsignal, df['macdhist'] = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-    df['EMA9'] = talib.EMA(df.close, 9)
+    df['EMA15'] = talib.EMA(df.close, 15)
     df['EMA55'] = talib.EMA(df.close, 55)
     df['EMA200'] = talib.EMA(df.close, 200)
 
     df['date'] = df.index
     df.reset_index(drop=True, inplace=True)
     df.fillna(method='ffill', inplace=True)
-
-    df.drop_duplicates(subset='date', keep='last', inplace=True)
 
     print('Calculating signals')
     df['cross'] = df.apply(long_short, axis=1)

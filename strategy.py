@@ -1,7 +1,7 @@
 def long_short(df):
-    if (df['EMA9'] > df['EMA55']) and (df['rsi'] >= 51) and (df['macdhist'] >= 0):
+    if (df['EMA15'] > df['EMA55']) and (df['rsi'] >= 51) and (df['macdhist'] >= 0):
         return 2
-    if (df['EMA9'] < df['EMA55']) and (df['rsi'] <= 49) and (df['macdhist'] <= 0):
+    if (df['EMA15'] < df['EMA55']) and (df['rsi'] <= 49) and (df['macdhist'] <= 0):
         return 1
     else:
         return 0
