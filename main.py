@@ -78,13 +78,14 @@ def run():
             print(f'Flipping to long at {price}')
             balance = client.fetch_balance()
             last_order = client.fetch_closed_orders(symbol)
-            if last_order[-1]['info']['side'] == 'Sell':
-                close = client.create_order(
-                        symbol = 'ETHUSD',
-                        type = 'market',
-                        side = 'buy',
-                        amount = int(last_order[-1]['info']['qty']),               
-                        params = {'reduce_only': True})
+            if balance['ETH']['used']:
+                if last_order[-1]['info']['side'] == 'Sell':
+                    close = client.create_order(
+                            symbol = 'ETHUSD',
+                            type = 'market',
+                            side = 'buy',
+                            amount = int(last_order[-1]['info']['qty']),               
+                            params = {'reduce_only': True})
             sleep(2)
             balance = client.fetch_balance()
             print(balance['ETH'])
@@ -102,13 +103,14 @@ def run():
             print(f'Flipping to short at {price}')
             balance = client.fetch_balance()
             last_order = client.fetch_closed_orders(symbol)
-            if last_order[-1]['info']['side'] == 'Buy':
-                close = client.create_order(
-                        symbol = 'ETHUSD',
-                        type = 'market',
-                        side = 'sell',
-                        amount = int(last_order[-1]['info']['qty']),
-                        params = {'reduce_only': True})
+            if balance['ETH']['used']:
+                if last_order[-1]['info']['side'] == 'Buy':
+                    close = client.create_order(
+                            symbol = 'ETHUSD',
+                            type = 'market',
+                            side = 'sell',
+                            amount = int(last_order[-1]['info']['qty']),
+                            params = {'reduce_only': True})
             sleep(2)
             balance = client.fetch_balance()
             print(balance['ETH'])

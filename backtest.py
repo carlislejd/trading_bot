@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 def backtest(df, initial_capital=1000, taker_fee=0.0006, leverage=5):
     
     # Initialize the portfolio with an initial capital of 100
@@ -11,6 +13,9 @@ def backtest(df, initial_capital=1000, taker_fee=0.0006, leverage=5):
 
     # Set the leverage to 5x
     leverage = leverage
+
+    # Initialize a list to store the PnL values
+    pnl = []
     
     # Iterate through each row in the DataFrame
     for i, row in df.iterrows():
@@ -42,5 +47,8 @@ def backtest(df, initial_capital=1000, taker_fee=0.0006, leverage=5):
           portfolio -= 2 * investment * (row['close'] / investment)
           position = 'short'
         
-    # Return the final value of the portfolio
-    return portfolio
+        # Append the current PnL value to the list
+      pnl.append(portfolio - 100)
+      
+    # Return the list of PnL values
+    return pnl
